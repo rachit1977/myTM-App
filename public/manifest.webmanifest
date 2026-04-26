@@ -1,0 +1,25 @@
+{
+  "name": "myTM — สำหรับสมาชิก",
+  "short_name": "myTM",
+  "description": "แอปสำหรับสมาชิก myTM",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#169447",
+  "orientation": "portrait",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
