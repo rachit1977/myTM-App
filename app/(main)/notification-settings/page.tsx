@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, Gift, AlertCircle, Megaphone, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { AppBar } from "@/components/layout/app-bar";
@@ -105,17 +105,61 @@ export default function NotificationSettingsPage() {
   const [items, setItems] = useState<Toggle[]>(initial);
   const [chs, setChs] = useState(channels);
 
+  useEffect(() => {
+    fetch("/api/profile", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const prefs = (data?.notificationPrefs ?? {}) as Record<string, boolean>;
+        if (Object.keys(prefs).length === 0) return;
+        setItems((prev) =>
+          prev.map((it) => ({
+            ...it,
+            enabled: prefs[it.id] ?? it.enabled,
+          }))
+        );
+        setChs((prev) =>
+          prev.map((c) => ({
+            ...c,
+            enabled: prefs[`channel_${c.id}`] ?? c.enabled,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  const persist = (
+    nextItems: Toggle[],
+    nextChs: typeof channels
+  ): void => {
+    const prefs: Record<string, boolean> = {};
+    nextItems.forEach((it) => (prefs[it.id] = it.enabled));
+    nextChs.forEach((c) => (prefs[`channel_${c.id}`] = c.enabled));
+    fetch("/api/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationPrefs: prefs }),
+    }).catch(() => {});
+  };
+
   const toggleItem = (id: string) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, enabled: !it.enabled } : it))
-    );
+    setItems((prev) => {
+      const next = prev.map((it) =>
+        it.id === id ? { ...it, enabled: !it.enabled } : it
+      );
+      persist(next, chs);
+      return next;
+    });
     toast.success("อัปเดตการตั้งค่าเรียบร้อย");
   };
 
   const toggleChannel = (id: string) => {
-    setChs((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c))
-    );
+    setChs((prev) => {
+      const next = prev.map((c) =>
+        c.id === id ? { ...c, enabled: !c.enabled } : c
+      );
+      persist(items, next);
+      return next;
+    });
     toast.success("อัปเดตการตั้งค่าเรียบร้อย");
   };
 
@@ -141,7 +185,7 @@ export default function NotificationSettingsPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{it.label}</p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[13px] text-muted-foreground">
                     {it.desc}
                   </p>
                 </div>
@@ -164,7 +208,7 @@ export default function NotificationSettingsPage() {
             >
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{c.label}</p>
-                <p className="text-[11px] text-muted-foreground">{c.desc}</p>
+                <p className="text-[13px] text-muted-foreground">{c.desc}</p>
               </div>
               <Switch
                 checked={c.enabled}
@@ -175,7 +219,7 @@ export default function NotificationSettingsPage() {
           ))}
         </ul>
 
-        <p className="mt-6 rounded-xl bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-6 rounded-xl bg-muted/40 p-3 text-[13px] leading-relaxed text-muted-foreground">
           ข้อความสำคัญและประกาศจากระบบที่จำเป็น
           จะยังคงถูกส่งให้แม้ปิดการแจ้งเตือน
         </p>

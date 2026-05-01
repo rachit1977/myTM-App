@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage({
     <>
       <AppBar title="นโยบายความเป็นส่วนตัว" backHref={backHref} />
       <article className="px-4 py-4">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           ปรับปรุงล่าสุด 1 เมษายน 2569
         </p>
         <h1 className="mt-1 text-xl font-bold">
@@ -95,7 +95,7 @@ export default function PrivacyPolicyPage({
           privacy@thaimerry.com หรือโทร 02-420-0048
         </Section>
 
-        <p className="mt-8 rounded-xl bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-8 rounded-xl bg-muted/40 p-3 text-[13px] leading-relaxed text-muted-foreground">
           เอกสารนี้เป็นเวอร์ชันสรุปสำหรับการสาธิต (demo) เท่านั้น
           ฉบับสมบูรณ์ทางกฎหมายจะถูกเผยแพร่เมื่อให้บริการจริง
         </p>

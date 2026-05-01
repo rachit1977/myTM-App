@@ -52,6 +52,7 @@ export interface LuckyDrawEntry {
 
 export interface Winner {
   id: string;
+  rank: number;
   name: string;
   prize: string;
   drawDate: string;

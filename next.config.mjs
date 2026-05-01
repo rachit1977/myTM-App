@@ -8,6 +8,10 @@ const nextConfig = {
         hostname: "thaimerry.co.th",
         pathname: "/wp-content/uploads/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
     ],
   },
 };

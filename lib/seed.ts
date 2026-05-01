@@ -251,6 +251,7 @@ export const luckyDrawEntries: LuckyDrawEntry[] = [
 export const winners: Winner[] = [
   {
     id: "w-001",
+    rank: 1,
     name: "สมชาย ใจดี",
     prize: "ทองคำหนัก 1 บาท",
     drawDate: "2026-04-01",
@@ -258,31 +259,43 @@ export const winners: Winner[] = [
   },
   {
     id: "w-002",
+    rank: 2,
     name: "มาลี รักดี",
-    prize: "iPhone 16 Pro",
+    prize: "iPhone 17 Pro",
     drawDate: "2026-04-01",
     province: "เชียงใหม่",
   },
   {
     id: "w-003",
+    rank: 1,
     name: "ประสิทธิ์ ศรีสุข",
-    prize: "Smart TV 55 นิ้ว",
+    prize: "ทองคำหนัก 1 บาท",
     drawDate: "2026-03-01",
     province: "ขอนแก่น",
   },
   {
     id: "w-004",
+    rank: 2,
     name: "วิภาดา แก้วใส",
-    prize: "เครื่องซักผ้า 12 กก.",
+    prize: "iPhone 17 Pro",
     drawDate: "2026-03-01",
     province: "สงขลา",
   },
   {
     id: "w-005",
+    rank: 1,
     name: "สุนีย์ พงศ์ภัค",
-    prize: "บัตรกำนัล 10,000 บาท",
+    prize: "ทองคำหนัก 1 บาท",
     drawDate: "2026-02-01",
     province: "ชลบุรี",
+  },
+  {
+    id: "w-006",
+    rank: 2,
+    name: "มนัสพล ตั้งทางธรรม",
+    prize: "iPhone 17 Pro",
+    drawDate: "2026-02-01",
+    province: "สมุทรสาคร",
   },
 ];
 

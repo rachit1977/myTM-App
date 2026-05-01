@@ -2,17 +2,64 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, XCircle, ScanLine, Home } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Home, Loader2 } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
 import { AppBar } from "@/components/layout/app-bar";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/brand/product-image";
-import { mockCheckProduct, productBySlug } from "@/lib/seed";
 import { formatThaiDate, cn } from "@/lib/utils";
-import { Suspense } from "react";
+
+type CheckResult = {
+  serial: string;
+  isAuthentic: boolean;
+  productName: string;
+  product: string | null;
+  manufacturedAt?: string;
+  warrantyUntil?: string;
+  batch?: string;
+};
+
+type ProductLite = {
+  slug: string;
+  name: string;
+  imageUrl: string;
+};
 
 function Result() {
   const params = useSearchParams();
   const serial = params.get("serial") ?? "";
+  const [result, setResult] = useState<CheckResult | null>(null);
+  const [productInfo, setProductInfo] = useState<ProductLite | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!serial) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const [r, products] = await Promise.all([
+          fetch("/api/check-product", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ serial }),
+          }).then((res) => res.json()),
+          fetch("/api/products").then((res) => res.json()),
+        ]);
+        setResult(r);
+        if (r.product) {
+          const found = (products as ProductLite[]).find(
+            (p) => p.slug === r.product
+          );
+          setProductInfo(found ?? null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [serial]);
+
   if (!serial) {
     return (
       <div className="px-4 py-12 text-center text-sm text-muted-foreground">
@@ -20,9 +67,17 @@ function Result() {
       </div>
     );
   }
-  const result = mockCheckProduct(serial);
+
+  if (loading || !result) {
+    return (
+      <div className="flex flex-col items-center gap-2 px-4 py-12 text-center text-sm text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        กำลังตรวจสอบ...
+      </div>
+    );
+  }
+
   const ok = result.isAuthentic;
-  const productInfo = productBySlug(result.product);
 
   return (
     <div className="px-4 py-4">
@@ -53,7 +108,7 @@ function Result() {
         <div className="flex items-center gap-3">
           {productInfo && (
             <ProductImage
-              slug={result.product}
+              slug={productInfo.slug}
               src={productInfo.imageUrl}
               alt={result.productName}
               className="h-14 w-14 shrink-0 rounded-xl bg-white dark:bg-white/5"
@@ -68,16 +123,28 @@ function Result() {
           </div>
         </div>
 
-        <dl className="mt-4 space-y-2.5 border-t pt-4">
-          <Row label="หมายเลข Batch" value={result.batch} />
-          <Row label="วันที่ผลิต" value={formatThaiDate(result.manufacturedAt)} />
-          <Row label="รับประกันถึง" value={formatThaiDate(result.warrantyUntil)} />
-          <Row
-            label="สถานะ"
-            value={ok ? "ผ่านการตรวจสอบ" : "ไม่ผ่านการตรวจสอบ"}
-            valueClass={ok ? "text-brand-700" : "text-destructive"}
-          />
-        </dl>
+        {ok && result.batch && (
+          <dl className="mt-4 space-y-2.5 border-t pt-4">
+            <Row label="หมายเลข Batch" value={result.batch} />
+            {result.manufacturedAt && (
+              <Row
+                label="วันที่ผลิต"
+                value={formatThaiDate(result.manufacturedAt)}
+              />
+            )}
+            {result.warrantyUntil && (
+              <Row
+                label="รับประกันถึง"
+                value={formatThaiDate(result.warrantyUntil)}
+              />
+            )}
+            <Row
+              label="สถานะ"
+              value="ผ่านการตรวจสอบ"
+              valueClass="text-brand-700"
+            />
+          </dl>
+        )}
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-2">

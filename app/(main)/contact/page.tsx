@@ -86,7 +86,7 @@ export default function ContactPage() {
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[13px] text-muted-foreground">
                       {c.label}
                     </p>
                     <p className="text-sm font-medium leading-snug">

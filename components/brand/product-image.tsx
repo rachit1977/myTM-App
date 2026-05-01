@@ -7,7 +7,7 @@ import { ProductIcon } from "./product-icon";
 import type { ProductSlug } from "@/types";
 
 interface ProductImageProps {
-  slug: ProductSlug;
+  slug: ProductSlug | string;
   src: string;
   alt: string;
   className?: string;

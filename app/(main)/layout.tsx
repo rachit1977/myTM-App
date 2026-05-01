@@ -6,8 +6,10 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background pb-16">
-      <main className="flex-1">{children}</main>
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
+      <main className="flex-1 overflow-y-auto overscroll-contain">
+        {children}
+      </main>
       <BottomNav />
     </div>
   );

@@ -8,23 +8,26 @@ import {
   ExternalLink,
   ListChecks,
 } from "lucide-react";
-import { productBySlug, products } from "@/lib/seed";
+import { prisma } from "@/lib/prisma";
 import { AppBar } from "@/components/layout/app-bar";
 import { ProductImage } from "@/components/brand/product-image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-export function generateStaticParams() {
-  return products.map((p) => ({ id: p.slug }));
-}
+export const dynamic = "force-dynamic";
 
-export default function ProductDetailPage({
+type Spec = { label: string; value: string };
+
+export default async function ProductDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const product = productBySlug(params.id);
+  const product = await prisma.product.findUnique({
+    where: { slug: params.id },
+  });
   if (!product) notFound();
+  const specs = (product.specs ?? []) as Spec[];
 
   return (
     <>
@@ -117,7 +120,7 @@ export default function ProductDetailPage({
         <section className="mt-5 rounded-2xl border bg-card p-4">
           <h3 className="mb-3 text-sm font-semibold">ข้อมูลทางเทคนิค</h3>
           <dl className="space-y-2.5">
-            {product.specs.map((s) => (
+            {specs.map((s) => (
               <div
                 key={s.label}
                 className="flex items-center justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0"
@@ -137,7 +140,7 @@ export default function ProductDetailPage({
         >
           <span className="flex flex-col">
             <span className="font-medium">ดูข้อมูลเพิ่มเติมที่เว็บไซต์</span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[13px] text-muted-foreground">
               thaimerry.co.th
             </span>
           </span>

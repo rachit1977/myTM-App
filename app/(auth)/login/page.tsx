@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,8 +27,10 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/home";
   const [showPassword, setShowPassword] = useState(false);
   const {
     register,
@@ -39,17 +42,21 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: FormValues) => {
-    await new Promise((r) => setTimeout(r, 700));
-    const isMember = !data.identifier.toLowerCase().includes("new");
-    if (isMember) {
-      toast.success("เข้าสู่ระบบสำเร็จ");
-      router.push("/home");
-    } else {
-      toast.message("ยังไม่ได้เป็นสมาชิก", {
-        description: "ระบบจะพาไปสมัครสมาชิก",
+    const result = await signIn("credentials", {
+      identifier: data.identifier,
+      password: data.password,
+      redirect: false,
+    });
+    if (!result || !result.ok || result.error) {
+      toast.error("เข้าสู่ระบบไม่สำเร็จ", {
+        description: "กรุณาตรวจสอบเบอร์โทร/อีเมล และรหัสผ่าน",
       });
-      router.push("/signup");
+      return;
     }
+    toast.success("เข้าสู่ระบบสำเร็จ");
+    // Hard navigation guarantees the new session cookie is sent on the
+    // next request and any cached client state is dropped.
+    window.location.href = callbackUrl;
   };
 
   return (
@@ -144,10 +151,18 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <p className="mt-8 text-center text-[11px] text-muted-foreground">
-        เคล็ดลับสำหรับทดสอบ: ใส่คำว่า &quot;new&quot; ในช่องเบอร์/อีเมล
-        เพื่อจำลองว่าไม่ใช่สมาชิก
+      <p className="mt-8 text-center text-[13px] text-muted-foreground">
+        ทดสอบเข้าสู่ระบบด้วย{" "}
+        <span className="font-medium">test@test.com / abc@ABC123</span>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

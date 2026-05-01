@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,14 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ProductImage } from "@/components/brand/product-image";
-import {
-  products,
-  productBySlug,
-  luckyDrawEntries as seedEntries,
-} from "@/lib/seed";
 import { cn, formatThaiDate } from "@/lib/utils";
-import type { LuckyDrawEntry, ProductSlug } from "@/types";
 
 const schema = z.object({
   productSlug: z.string().min(1, "กรุณาเลือกสินค้า"),
@@ -43,8 +38,29 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+type ProductLite = {
+  id: string;
+  slug: string;
+  name: string;
+  imageUrl: string;
+};
+
+type LuckyStatus = "pending" | "approved" | "rejected";
+
+type LuckyEntry = {
+  id: string;
+  fullName: string;
+  receiptNo: string;
+  amount: string;
+  status: LuckyStatus;
+  productImage: string;
+  receiptImage: string;
+  createdAt: string;
+  product: { slug: string; name: string; imageUrl: string };
+};
+
 const statusMeta: Record<
-  LuckyDrawEntry["status"],
+  LuckyStatus,
   { label: string; variant: "warning" | "success" | "destructive" }
 > = {
   pending: { label: "รอตรวจสอบ", variant: "warning" },
@@ -53,9 +69,13 @@ const statusMeta: Record<
 };
 
 export default function LuckyDrawPage() {
-  const [entries, setEntries] = useState<LuckyDrawEntry[]>(seedEntries);
-  const [productImage, setProductImage] = useState<string | null>(null);
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductLite[]>([]);
+  const [entries, setEntries] = useState<LuckyEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [productFile, setProductFile] = useState<File | null>(null);
+  const [productPreview, setProductPreview] = useState<string | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -76,47 +96,87 @@ export default function LuckyDrawPage() {
 
   const productSlug = watch("productSlug");
 
-  const onPickFile =
-    (setter: (s: string | null) => void) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
-      if (f) setter(URL.createObjectURL(f));
-      e.target.value = "";
-    };
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/products", { cache: "no-store" }).then((r) => r.json()),
+      fetch("/api/lucky-draw", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : []
+      ),
+    ])
+      .then(([p, e]) => {
+        setProducts(p);
+        setEntries(e);
+      })
+      .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const pickProduct = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) {
+      setProductFile(f);
+      setProductPreview(URL.createObjectURL(f));
+    }
+    e.target.value = "";
+  };
+
+  const pickReceipt = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) {
+      setReceiptFile(f);
+      setReceiptPreview(URL.createObjectURL(f));
+    }
+    e.target.value = "";
+  };
+
+  const uploadOne = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("prefix", "lucky-draw");
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (!res.ok) throw new Error("upload failed");
+    const blob = await res.json();
+    return blob.url;
+  };
 
   const onSubmit = async (data: FormValues) => {
-    if (!productImage || !receiptImage) {
+    if (!productFile || !receiptFile) {
       toast.error("กรุณาแนบรูปสินค้าและใบเสร็จ");
       return;
     }
-    await new Promise((r) => setTimeout(r, 800));
-    const product = products.find((p) => p.slug === data.productSlug)!;
-    const newEntry: LuckyDrawEntry = {
-      id: `ld-${Date.now()}`,
-      productSlug: data.productSlug as ProductSlug,
-      productName: product.name,
-      receiptNo: data.receiptNo,
-      amount: parseFloat(data.amount),
-      uploadedAt: new Date().toISOString(),
-      status: "pending",
-    };
-    setEntries((p) => [newEntry, ...p]);
-    setProductImage(null);
-    setReceiptImage(null);
-    reset();
-    toast.success("ส่งข้อมูลเข้าร่วมลุ้นชิงโชคเรียบร้อย", {
-      description: "ทีมงานจะตรวจสอบและอัปเดตสถานะให้คุณ",
-    });
+    try {
+      const [productUrl, receiptUrl] = await Promise.all([
+        uploadOne(productFile),
+        uploadOne(receiptFile),
+      ]);
+      const res = await fetch("/api/lucky-draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productSlug: data.productSlug,
+          fullName: data.fullName,
+          address: data.address,
+          receiptNo: data.receiptNo,
+          amount: parseFloat(data.amount),
+          productImage: productUrl,
+          receiptImage: receiptUrl,
+        }),
+      });
+      if (!res.ok) throw new Error("create failed");
+      const created: LuckyEntry = await res.json();
+      setEntries((p) => [created, ...p]);
+      setProductFile(null);
+      setProductPreview(null);
+      setReceiptFile(null);
+      setReceiptPreview(null);
+      reset();
+      toast.success("ส่งข้อมูลเข้าร่วมลุ้นชิงโชคเรียบร้อย", {
+        description: "ทีมงานจะตรวจสอบและอัปเดตสถานะให้คุณ",
+      });
+    } catch {
+      toast.error("ส่งข้อมูลไม่สำเร็จ", { description: "ลองใหม่อีกครั้ง" });
+    }
   };
-
-  const sorted = useMemo(
-    () =>
-      [...entries].sort(
-        (a, b) =>
-          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      ),
-    [entries]
-  );
 
   return (
     <>
@@ -144,13 +204,13 @@ export default function LuckyDrawPage() {
             />
             <div className="min-w-0 flex-1">
               <p className="text-[17px] font-bold leading-tight text-white">
-                รางวัลประจำเดือน เมษายน 2569
+                รางวัลประจำเดือน พฤษภาคม 2569
               </p>
               <p className="mt-0.5 text-[17px] font-semibold leading-tight text-amber-300">
                 ทองคำแท่งหนัก 1 บาท
               </p>
               <p className="mt-1.5 text-[13px] leading-snug text-zinc-300">
-                จับรางวัลต้นเดือน พฤษภาคม 2569
+                จับรางวัลต้นเดือน มิถุนายน 2569
               </p>
             </div>
           </div>
@@ -265,15 +325,21 @@ export default function LuckyDrawPage() {
           <div className="grid grid-cols-2 gap-3">
             <UploadSlot
               label="รูปสินค้า"
-              src={productImage}
-              onChange={onPickFile(setProductImage)}
-              onClear={() => setProductImage(null)}
+              src={productPreview}
+              onChange={pickProduct}
+              onClear={() => {
+                setProductFile(null);
+                setProductPreview(null);
+              }}
             />
             <UploadSlot
               label="รูปใบเสร็จ"
-              src={receiptImage}
-              onChange={onPickFile(setReceiptImage)}
-              onClear={() => setReceiptImage(null)}
+              src={receiptPreview}
+              onChange={pickReceipt}
+              onClear={() => {
+                setReceiptFile(null);
+                setReceiptPreview(null);
+              }}
             />
           </div>
 
@@ -294,33 +360,45 @@ export default function LuckyDrawPage() {
 
         <section className="mt-8">
           <h2 className="mb-3 text-sm font-semibold">ประวัติการอัพโหลด</h2>
-          {sorted.length === 0 ? (
+          {loading ? (
+            <ul className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="flex gap-3 rounded-xl border bg-card p-3"
+                >
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : entries.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-10 text-center text-sm text-muted-foreground">
               <Inbox className="h-8 w-8" />
               ยังไม่มีรายการ
             </div>
           ) : (
             <ul className="space-y-2">
-              {sorted.map((e) => {
-                const p = productBySlug(e.productSlug);
-                return (
+              {entries.map((e) => (
                 <li
                   key={e.id}
                   className="flex gap-3 rounded-xl border bg-card p-3"
                 >
-                  {p && (
-                    <ProductImage
-                      slug={e.productSlug}
-                      src={p.imageUrl}
-                      alt={e.productName}
-                      className="h-12 w-12 shrink-0 rounded-lg bg-white dark:bg-white/5"
-                      sizes="48px"
-                    />
-                  )}
+                  <ProductImage
+                    slug={e.product.slug}
+                    src={e.product.imageUrl}
+                    alt={e.product.name}
+                    className="h-12 w-12 shrink-0 rounded-lg bg-white dark:bg-white/5"
+                    sizes="48px"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <p className="truncate text-sm font-semibold">
-                        {e.productName}
+                        {e.product.name}
                       </p>
                       <Badge variant={statusMeta[e.status].variant}>
                         {statusMeta[e.status].label}
@@ -329,16 +407,15 @@ export default function LuckyDrawPage() {
                     <p className="text-xs text-muted-foreground">
                       ใบเสร็จ: {e.receiptNo}
                     </p>
-                    <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{formatThaiDate(e.uploadedAt)}</span>
+                    <div className="mt-1 flex items-center justify-between text-[13px] text-muted-foreground">
+                      <span>{formatThaiDate(e.createdAt)}</span>
                       <span className="font-medium text-foreground">
-                        ฿{e.amount.toLocaleString()}
+                        ฿{Number(e.amount).toLocaleString()}
                       </span>
                     </div>
                   </div>
                 </li>
-                );
-              })}
+              ))}
             </ul>
           )}
         </section>

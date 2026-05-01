@@ -45,11 +45,15 @@ export function ProductIcon({
   className,
   size = "md",
 }: {
-  slug: ProductSlug;
+  slug: ProductSlug | string;
   className?: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const cfg = map[slug];
+  const cfg = map[slug as ProductSlug] ?? {
+    icon: Square,
+    bg: "bg-muted",
+    fg: "text-muted-foreground",
+  };
   const Icon = cfg.icon;
   const dim =
     size === "sm" ? "h-10 w-10" : size === "lg" ? "h-20 w-20" : "h-14 w-14";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BellOff,
@@ -11,9 +11,10 @@ import {
   Sparkles,
   Trophy,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AppBar } from "@/components/layout/app-bar";
 import { Button } from "@/components/ui/button";
-import { notifications as seedNotifications } from "@/lib/seed";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { AppNotification, NotificationType } from "@/types";
 
@@ -67,7 +68,16 @@ function formatRelative(iso: string) {
 }
 
 export default function NotificationsPage() {
-  const [items, setItems] = useState<AppNotification[]>(seedNotifications);
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/notifications", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setItems)
+      .catch(() => toast.error("โหลดการแจ้งเตือนไม่สำเร็จ"))
+      .finally(() => setLoading(false));
+  }, []);
 
   const unreadCount = useMemo(
     () => items.filter((n) => !n.read).length,
@@ -83,14 +93,24 @@ export default function NotificationsPage() {
     [items]
   );
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
   };
 
-  const markRead = (id: string) => {
+  const markRead = async (id: string) => {
     setItems((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
   };
 
   return (
@@ -118,7 +138,23 @@ export default function NotificationsPage() {
           </p>
         )}
 
-        {sorted.length === 0 ? (
+        {loading ? (
+          <ul className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <li
+                key={i}
+                className="flex gap-3 rounded-2xl border bg-card p-3"
+              >
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : sorted.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed py-16 text-center text-sm text-muted-foreground">
             <BellOff className="h-8 w-8" />
             ยังไม่มีการแจ้งเตือน
@@ -165,7 +201,7 @@ export default function NotificationsPage() {
                     <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                       {n.message}
                     </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+                    <p className="mt-1 text-[13px] text-muted-foreground">
                       {formatRelative(n.createdAt)}
                     </p>
                   </div>

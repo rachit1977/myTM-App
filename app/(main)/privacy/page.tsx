@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ShieldCheck, FileText, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -66,10 +66,33 @@ function Switch({
 export default function PrivacyPage() {
   const [items, setItems] = useState(sections);
 
+  useEffect(() => {
+    fetch("/api/profile", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const prefs = (data?.privacyPrefs ?? {}) as Record<string, boolean>;
+        if (Object.keys(prefs).length === 0) return;
+        setItems((prev) =>
+          prev.map((it) => ({ ...it, enabled: prefs[it.id] ?? it.enabled }))
+        );
+      })
+      .catch(() => {});
+  }, []);
+
   const toggle = (id: string) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, enabled: !it.enabled } : it))
-    );
+    setItems((prev) => {
+      const next = prev.map((it) =>
+        it.id === id ? { ...it, enabled: !it.enabled } : it
+      );
+      const prefs: Record<string, boolean> = {};
+      next.forEach((it) => (prefs[it.id] = it.enabled));
+      fetch("/api/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ privacyPrefs: prefs }),
+      }).catch(() => {});
+      return next;
+    });
     toast.success("อัปเดตการตั้งค่าเรียบร้อย");
   };
 
@@ -110,7 +133,7 @@ export default function PrivacyPage() {
             >
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{s.label}</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
                   {s.desc}
                 </p>
               </div>
@@ -169,7 +192,7 @@ export default function PrivacyPage() {
           </Button>
         </div>
 
-        <p className="mt-6 rounded-xl bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-6 rounded-xl bg-muted/40 p-3 text-[13px] leading-relaxed text-muted-foreground">
           คุณสามารถเปลี่ยนแปลงการตั้งค่าเหล่านี้ได้ตลอดเวลา
           การถอนความยินยอมจะมีผลตั้งแต่วันที่ดำเนินการเป็นต้นไป
           และไม่กระทบการใช้ข้อมูลที่ดำเนินการไปแล้วก่อนหน้านี้

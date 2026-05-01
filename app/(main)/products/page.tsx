@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { ChevronRight, ExternalLink } from "lucide-react";
-import { products } from "@/lib/seed";
+import { prisma } from "@/lib/prisma";
 import { AppBar } from "@/components/layout/app-bar";
 import { ProductImage } from "@/components/brand/product-image";
 
-export default function ProductsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ProductsPage() {
+  const products = await prisma.product.findMany({
+    orderBy: { createdAt: "asc" },
+  });
   return (
     <>
       <AppBar title="สินค้าของเรา" />
@@ -24,7 +29,7 @@ export default function ProductsPage() {
             href="https://thaimerry.co.th"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+            className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-primary hover:underline"
           >
             thaimerry.co.th
             <ExternalLink className="h-3 w-3" />

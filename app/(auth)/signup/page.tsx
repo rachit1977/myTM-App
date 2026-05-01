@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -66,10 +67,32 @@ export default function SignupPage() {
 
   const accepted = watch("acceptTerms");
 
-  const onSubmit = async (_: FormValues) => {
-    await new Promise((r) => setTimeout(r, 800));
+  const onSubmit = async (data: FormValues) => {
+    const res = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fullName: data.fullName,
+        phone: data.phone,
+        email: data.email,
+        password: data.password,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.error("สมัครสมาชิกไม่สำเร็จ", {
+        description: body.error ?? "กรุณาลองใหม่อีกครั้ง",
+      });
+      return;
+    }
     toast.success("สมัครสมาชิกสำเร็จ", { description: "ยินดีต้อนรับสู่ myTM" });
+    await signIn("credentials", {
+      identifier: data.email,
+      password: data.password,
+      redirect: false,
+    });
     router.push("/home");
+    router.refresh();
   };
 
   return (

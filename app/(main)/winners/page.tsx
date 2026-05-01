@@ -1,11 +1,18 @@
 import { Trophy, MapPin } from "lucide-react";
 import { AppBar } from "@/components/layout/app-bar";
-import { winners } from "@/lib/seed";
+import { prisma } from "@/lib/prisma";
 import { formatThaiDate } from "@/lib/utils";
 
-export default function WinnersPage() {
+export const dynamic = "force-dynamic";
+
+export default async function WinnersPage() {
+  const winners = await prisma.winner.findMany({
+    orderBy: [{ drawDate: "desc" }, { rank: "asc" }],
+  });
+
   const grouped = winners.reduce<Record<string, typeof winners>>((acc, w) => {
-    (acc[w.drawDate] ||= []).push(w);
+    const key = w.drawDate.toISOString().slice(0, 10);
+    (acc[key] ||= []).push(w);
     return acc;
   }, {});
 
@@ -35,22 +42,22 @@ export default function WinnersPage() {
               <h2 className="text-sm font-semibold">
                 ประกาศผลวันที่ {formatThaiDate(date)}
               </h2>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[13px] text-muted-foreground">
                 {grouped[date].length} รางวัล
               </span>
             </div>
             <ul className="space-y-2">
-              {grouped[date].map((w, i) => (
+              {grouped[date].map((w) => (
                 <li
                   key={w.id}
                   className="flex items-center gap-3 rounded-xl border bg-card p-3"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-sm font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                    {i + 1}
+                    {w.rank}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{w.name}</p>
-                    <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <p className="flex items-center gap-1 text-[13px] text-muted-foreground">
                       <MapPin className="h-3 w-3" />
                       {w.province}
                     </p>

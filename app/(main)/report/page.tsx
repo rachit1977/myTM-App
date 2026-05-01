@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,14 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ProductImage } from "@/components/brand/product-image";
-import {
-  products,
-  productBySlug,
-  reports as seedReports,
-} from "@/lib/seed";
 import { cn, formatThaiDate } from "@/lib/utils";
-import type { Report, ProductSlug } from "@/types";
 
 const schema = z.object({
   productSlug: z.string().min(1, "กรุณาเลือกสินค้า"),
@@ -32,8 +27,27 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+type ProductLite = {
+  id: string;
+  slug: string;
+  name: string;
+  imageUrl: string;
+};
+
+type ReportStatus = "pending" | "in_progress" | "resolved";
+
+type ReportItem = {
+  id: string;
+  topic: string;
+  detail: string;
+  status: ReportStatus;
+  imageUrls: string[];
+  createdAt: string;
+  product: { slug: string; name: string; imageUrl: string };
+};
+
 const statusMeta: Record<
-  Report["status"],
+  ReportStatus,
   { label: string; variant: "warning" | "success" | "default" }
 > = {
   pending: { label: "รอดำเนินการ", variant: "warning" },
@@ -42,8 +56,11 @@ const statusMeta: Record<
 };
 
 export default function ReportPage() {
-  const [reports, setReports] = useState<Report[]>(seedReports);
-  const [images, setImages] = useState<string[]>([]);
+  const [products, setProducts] = useState<ProductLite[]>([]);
+  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const {
     register,
     handleSubmit,
@@ -59,45 +76,67 @@ export default function ReportPage() {
   const productSlug = watch("productSlug");
   const detail = watch("detail") ?? "";
 
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/products", { cache: "no-store" }).then((r) => r.json()),
+      fetch("/api/reports", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : []
+      ),
+    ])
+      .then(([p, r]) => {
+        setProducts(p);
+        setReports(r);
+      })
+      .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ"))
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    const remaining = 4 - images.length;
-    const next = files.slice(0, remaining).map((f) => URL.createObjectURL(f));
-    setImages((p) => [...p, ...next]);
+    const incoming = Array.from(e.target.files ?? []);
+    const remaining = 4 - files.length;
+    const next = incoming.slice(0, remaining);
+    setFiles((p) => [...p, ...next]);
+    setPreviews((p) => [...p, ...next.map((f) => URL.createObjectURL(f))]);
     e.target.value = "";
   };
 
-  const removeImage = (idx: number) =>
-    setImages((p) => p.filter((_, i) => i !== idx));
-
-  const onSubmit = async (data: FormValues) => {
-    await new Promise((r) => setTimeout(r, 800));
-    const product = products.find((p) => p.slug === data.productSlug)!;
-    const newReport: Report = {
-      id: `r-${Date.now()}`,
-      productSlug: data.productSlug as ProductSlug,
-      productName: product.name,
-      topic: data.topic,
-      detail: data.detail,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
-    setReports((p) => [newReport, ...p]);
-    setImages([]);
-    reset();
-    toast.success("ส่งคำร้องเรียบร้อย", {
-      description: "ทีมงานจะติดต่อกลับภายใน 1-2 วันทำการ",
-    });
+  const removeImage = (idx: number) => {
+    setFiles((p) => p.filter((_, i) => i !== idx));
+    setPreviews((p) => p.filter((_, i) => i !== idx));
   };
 
-  const sortedReports = useMemo(
-    () =>
-      [...reports].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ),
-    [reports]
-  );
+  const onSubmit = async (data: FormValues) => {
+    try {
+      // Upload all images first
+      const uploadedUrls: string[] = [];
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append("file", f);
+        fd.append("prefix", "reports");
+        const up = await fetch("/api/upload", { method: "POST", body: fd });
+        if (!up.ok) throw new Error("upload failed");
+        const blob = await up.json();
+        uploadedUrls.push(blob.url);
+      }
+
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, imageUrls: uploadedUrls }),
+      });
+      if (!res.ok) throw new Error("create failed");
+      const created: ReportItem = await res.json();
+      setReports((p) => [created, ...p]);
+      setFiles([]);
+      setPreviews([]);
+      reset();
+      toast.success("ส่งคำร้องเรียบร้อย", {
+        description: "ทีมงานจะติดต่อกลับภายใน 1-2 วันทำการ",
+      });
+    } catch {
+      toast.error("ส่งคำร้องไม่สำเร็จ", { description: "ลองใหม่อีกครั้ง" });
+    }
+  };
 
   return (
     <>
@@ -175,7 +214,7 @@ export default function ReportPage() {
               ) : (
                 <span />
               )}
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[13px] text-muted-foreground">
                 {detail.length}/500
               </span>
             </div>
@@ -184,7 +223,7 @@ export default function ReportPage() {
           <div className="space-y-1.5">
             <Label>แนบรูปภาพ (สูงสุด 4 รูป)</Label>
             <div className="grid grid-cols-4 gap-2">
-              {images.map((src, i) => (
+              {previews.map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <div key={i} className="relative aspect-square">
                   <img
@@ -202,7 +241,7 @@ export default function ReportPage() {
                   </button>
                 </div>
               ))}
-              {images.length < 4 && (
+              {previews.length < 4 && (
                 <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-xs text-muted-foreground hover:bg-accent">
                   <ImagePlus className="h-5 w-5" />
                   เพิ่มรูป
@@ -235,51 +274,60 @@ export default function ReportPage() {
 
         <section className="mt-8">
           <h2 className="mb-3 text-sm font-semibold">ประวัติการแจ้งปัญหา</h2>
-          {sortedReports.length === 0 ? (
+          {loading ? (
+            <ul className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="flex gap-3 rounded-xl border bg-card p-3"
+                >
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : reports.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-10 text-center text-sm text-muted-foreground">
               <Inbox className="h-8 w-8" />
               ยังไม่มีรายการ
             </div>
           ) : (
             <ul className="space-y-2">
-              {sortedReports.map((r) => {
-                const p = productBySlug(r.productSlug);
-                return (
+              {reports.map((r) => (
                 <li
                   key={r.id}
                   className="flex gap-3 rounded-xl border bg-card p-3"
                 >
-                  {p && (
-                    <ProductImage
-                      slug={r.productSlug}
-                      src={p.imageUrl}
-                      alt={r.productName}
-                      className="h-12 w-12 shrink-0 rounded-lg bg-white dark:bg-white/5"
-                      sizes="48px"
-                    />
-                  )}
+                  <ProductImage
+                    slug={r.product.slug}
+                    src={r.product.imageUrl}
+                    alt={r.product.name}
+                    className="h-12 w-12 shrink-0 rounded-lg bg-white dark:bg-white/5"
+                    sizes="48px"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="truncate text-sm font-semibold">
-                        {r.topic}
-                      </p>
+                      <p className="truncate text-sm font-semibold">{r.topic}</p>
                       <Badge variant={statusMeta[r.status].variant}>
                         {statusMeta[r.status].label}
                       </Badge>
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
-                      {r.productName}
+                      {r.product.name}
                     </p>
                     <p className="line-clamp-2 mt-1 text-xs text-muted-foreground">
                       {r.detail}
                     </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+                    <p className="mt-1 text-[13px] text-muted-foreground">
                       {formatThaiDate(r.createdAt)}
                     </p>
                   </div>
                 </li>
-                );
-              })}
+              ))}
             </ul>
           )}
         </section>

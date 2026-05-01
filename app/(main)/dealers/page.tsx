@@ -150,7 +150,7 @@ export default function DealersPage() {
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[13px] text-muted-foreground">
                       {c.label}
                     </p>
                     <p className="text-sm font-medium leading-snug">
@@ -181,7 +181,7 @@ export default function DealersPage() {
                     <Logo className="h-6 w-6" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[13px] text-muted-foreground">
                       {s.label}
                     </p>
                     <p className="truncate text-sm font-medium">{s.value}</p>

@@ -11,9 +11,15 @@ import {
   Bell,
   ChevronRight,
 } from "lucide-react";
-import { currentUser, notifications, productBySlug } from "@/lib/seed";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/brand/product-image";
+import { tierBadgeClass } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 const menus = [
   {
@@ -98,9 +104,22 @@ const menus = [
   },
 ];
 
-export default function HomePage() {
-  const promoProduct = productBySlug("merrybright-twins");
-  const unreadCount = notifications.filter((n) => !n.read).length;
+export default async function HomePage() {
+  const session = await getServerSession(authOptions);
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!userId) redirect("/login");
+
+  const [user, promoProduct, unreadCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true, points: true, tier: true },
+    }),
+    prisma.product.findUnique({ where: { slug: "merrybright-twins" } }),
+    prisma.notification.count({ where: { userId, read: false } }),
+  ]);
+
+  if (!user) redirect("/login");
+
   return (
     <div>
       <header className="bg-gradient-to-br from-brand to-brand-700 px-5 pb-10 pt-6 text-white">
@@ -108,7 +127,7 @@ export default function HomePage() {
           <div>
             <p className="text-base font-medium opacity-90">สวัสดี</p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight">
-              {currentUser.fullName}
+              {user.fullName}
             </h1>
           </div>
           <Link
@@ -132,9 +151,9 @@ export default function HomePage() {
         <div className="mt-6 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] opacity-80">คะแนนสะสมของฉัน</p>
+              <p className="text-[13px] opacity-80">คะแนนสะสมของฉัน</p>
               <p className="text-2xl font-bold">
-                {currentUser.points.toLocaleString()}
+                {user.points.toLocaleString()}
                 <span className="ml-1 text-sm font-medium opacity-90">
                   คะแนน
                 </span>
@@ -142,9 +161,9 @@ export default function HomePage() {
             </div>
             <Badge
               variant="secondary"
-              className="bg-gradient-to-br from-amber-300 to-yellow-500 text-black shadow-sm hover:from-amber-300 hover:to-yellow-500"
+              className={`shadow-sm ${tierBadgeClass(user.tier)}`}
             >
-              {currentUser.tier} Member
+              {user.tier} Member
             </Badge>
           </div>
         </div>
@@ -167,7 +186,7 @@ export default function HomePage() {
                     {m.label}
                   </p>
                   <p
-                    className={`mt-1 text-[11px] leading-snug ${m.desc_}`}
+                    className={`mt-1 text-[13px] leading-snug ${m.desc_}`}
                   >
                     {m.desc}
                   </p>
@@ -198,7 +217,7 @@ export default function HomePage() {
                 ลุ้นชิงโชครางวัลใหญ่ทุกเดือน
               </p>
               <p className="mt-1.5 text-[13px] leading-snug text-zinc-300">
-                รางวัลประจำเดือน เมษายน 2569
+                รางวัลประจำเดือน พฤษภาคม 2569
               </p>
               <p className="mt-0.5 text-[17px] font-semibold leading-tight text-amber-300">
                 ทองคำแท่งหนัก 1 บาท
@@ -237,7 +256,7 @@ export default function HomePage() {
               <p className="text-xs font-semibold">
                 {promoProduct?.name ?? "เมอร์รี่ไบรท์ทวินส์"}
               </p>
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
                 ซื้อครบ 200 บาท ลุ้นรับทองคำหนัก 1 บาท ทุกต้นเดือน
               </p>
             </div>
