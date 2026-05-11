@@ -64,7 +64,7 @@ function LoginForm() {
       <div className="flex flex-1 flex-col justify-center">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo />
-          <h1 className="mt-4 text-2xl font-bold">ยินดีต้อนรับกลับ</h1>
+          <h1 className="mt-4 text-2xl font-bold">ยินดีต้อนรับ</h1>
           <p className="text-sm text-muted-foreground">
             เข้าสู่ระบบเพื่อใช้งานสิทธิประโยชน์สำหรับสมาชิก
           </p>
@@ -150,11 +150,6 @@ function LoginForm() {
           </Link>
         </p>
       </div>
-
-      <p className="mt-8 text-center text-[13px] text-muted-foreground">
-        ทดสอบเข้าสู่ระบบด้วย{" "}
-        <span className="font-medium">test@test.com / abc@ABC123</span>
-      </p>
     </div>
   );
 }

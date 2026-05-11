@@ -3,9 +3,49 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+// SameSite=None + Secure cookies so the app can authenticate when embedded
+// in a third-party iframe (e.g. Ionic Capacitor WebView). Required for
+// modern browsers to send the session cookie in cross-origin contexts.
+const useSecureCookies =
+  process.env.NEXTAUTH_URL?.startsWith("https://") === true;
+const cookiePrefix = useSecureCookies ? "__Secure-" : "";
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  useSecureCookies,
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    callbackUrl: {
+      name: `${cookiePrefix}next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    csrfToken: {
+      // __Host- prefix needs Path=/ and no Domain — keep separate from session
+      name: useSecureCookies
+        ? "__Host-next-auth.csrf-token"
+        : "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "credentials",

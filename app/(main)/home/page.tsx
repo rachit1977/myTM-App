@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   Package,
@@ -17,7 +18,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/brand/product-image";
-import { tierBadgeClass } from "@/lib/utils";
+import { initialsFrom, tierBadgeClass } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +113,7 @@ export default async function HomePage() {
   const [user, promoProduct, unreadCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { fullName: true, points: true, tier: true },
+      select: { fullName: true, points: true, tier: true, avatarUrl: true },
     }),
     prisma.product.findUnique({ where: { slug: "merrybright-twins" } }),
     prisma.notification.count({ where: { userId, read: false } }),
@@ -123,13 +124,35 @@ export default async function HomePage() {
   return (
     <div>
       <header className="bg-gradient-to-br from-brand to-brand-700 px-5 pb-10 pt-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-base font-medium opacity-90">สวัสดี</p>
-            <h1 className="mt-0.5 text-2xl font-bold leading-tight">
-              {user.fullName}
-            </h1>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/profile"
+            aria-label="ไปยังหน้าบัญชี"
+            className="flex min-w-0 flex-1 items-center gap-3 transition-opacity active:opacity-80"
+          >
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white/20 ring-2 ring-white/40">
+              {user.avatarUrl ? (
+                <Image
+                  src={user.avatarUrl}
+                  alt={user.fullName}
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-base font-bold tracking-wide">
+                  {initialsFrom(user.fullName)}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium opacity-90">สวัสดี</p>
+              <h1 className="mt-0.5 truncate text-2xl font-bold leading-tight">
+                {user.fullName}
+              </h1>
+            </div>
+          </Link>
           <Link
             href="/notifications"
             aria-label={
